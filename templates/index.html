@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Trade skills, not money{% endblock %}
+{% block body_class %}sw-landing{% endblock %}
+
+{% block content %}
+
+<!-- ============ HERO ============ -->
+<section class="sw-hero">
+  <div class="container">
+    <div class="row align-items-center gy-5">
+      <div class="col-lg-6">
+        <span class="sw-eyebrow"><i class="bi bi-mortarboard me-1"></i> Made for campus communities</span>
+        <h1 class="sw-hero-title">Trade skills,<br><span class="sw-accent-text">not money.</span></h1>
+        <p class="sw-hero-sub">
+          SkillSwap pairs you with classmates for one-to-one skill trades.
+          Know Python? Trade it for Photoshop lessons. No fees, no tutors &mdash;
+          just students teaching students.
+        </p>
+        <div class="d-flex flex-wrap gap-3 mt-4">
+          <a href="{{ url_for('register') }}" class="btn sw-btn-primary btn-lg px-4">Create your account</a>
+          <a href="{{ url_for('login') }}" class="btn sw-btn-ghost btn-lg px-4">I already have one</a>
+        </div>
+        <div class="sw-hero-stats d-flex gap-4 mt-5">
+          <div><div class="sw-stat-num">1:1</div><div class="sw-stat-label">Skill trades</div></div>
+          <div><div class="sw-stat-num">0&#8377;</div><div class="sw-stat-label">Cost to swap</div></div>
+          <div><div class="sw-stat-num">★5</div><div class="sw-stat-label">Rated swaps</div></div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <!-- Signature element: a live "match" card showing the example from the brief -->
+        <div class="sw-match-demo">
+          <div class="sw-demo-card sw-demo-card-a">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="sw-avatar" style="background:#2563eb">TJ</span>
+              <div>
+                <div class="fw-semibold">Tejas</div>
+                <div class="sw-demo-sub">Computer Science · 3rd Year</div>
+              </div>
+            </div>
+            <div class="sw-demo-tag sw-tag-offer"><i class="bi bi-arrow-up-circle"></i> Offers Python</div>
+            <div class="sw-demo-tag sw-tag-want"><i class="bi bi-arrow-down-circle"></i> Wants Photoshop</div>
+          </div>
+
+          <div class="sw-match-link">
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Perfect Match</span>
+          </div>
+
+          <div class="sw-demo-card sw-demo-card-b">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="sw-avatar" style="background:#0ea5e9">RA</span>
+              <div>
+                <div class="fw-semibold">Rahul</div>
+                <div class="sw-demo-sub">Design · 2nd Year</div>
+              </div>
+            </div>
+            <div class="sw-demo-tag sw-tag-offer"><i class="bi bi-arrow-up-circle"></i> Offers Photoshop</div>
+            <div class="sw-demo-tag sw-tag-want"><i class="bi bi-arrow-down-circle"></i> Wants Python</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="sw-section">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="sw-eyebrow">The process</span>
+      <h2 class="sw-section-title">Four steps to your first swap</h2>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="sw-step-card">
+          <div class="sw-step-num">01</div>
+          <h3 class="sw-step-title">List your skills</h3>
+          <p>Add what you can teach and what you're hoping to learn.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="sw-step-card">
+          <div class="sw-step-num">02</div>
+          <h3 class="sw-step-title">Get matched</h3>
+          <p>Our algorithm finds students whose skills complement yours.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="sw-step-card">
+          <div class="sw-step-num">03</div>
+          <h3 class="sw-step-title">Send a request</h3>
+          <p>Propose a swap and arrange a time that works for you both.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="sw-step-card">
+          <div class="sw-step-num">04</div>
+          <h3 class="sw-step-title">Swap & rate</h3>
+          <p>Complete the exchange, then leave feedback for each other.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="sw-section sw-section-tinted">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="sw-eyebrow">Why SkillSwap</span>
+      <h2 class="sw-section-title">Everything you need to trade knowledge</h2>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6">
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon"><i class="bi bi-stars"></i></div>
+          <h3>Smart matching</h3>
+          <p>We surface students whose offered skills match what you want &mdash; and vice versa.</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon"><i class="bi bi-search"></i></div>
+          <h3>Search by skill or department</h3>
+          <p>Find classmates by skill, department, or year &mdash; not just who you already know.</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon"><i class="bi bi-shield-check"></i></div>
+          <h3>Rated & accountable</h3>
+          <p>Every completed swap gets a star rating, so good teaching partners stand out.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="sw-cta">
+  <div class="container text-center">
+    <h2 class="sw-section-title text-white">Got a skill worth sharing?</h2>
+    <p class="sw-cta-sub">Someone on campus is looking for exactly what you know.</p>
+    <a href="{{ url_for('register') }}" class="btn sw-btn-light btn-lg px-5 mt-3">Join SkillSwap free</a>
+  </div>
+</section>
+
+{% endblock %}

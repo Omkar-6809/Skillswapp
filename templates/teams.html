@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Teams{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="sw-page-head">
+  <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Teams</h1>
+      <p class="text-muted mb-0 small">Find or create a squad for your next hackathon or competition</p>
+    </div>
+    <button class="btn sw-btn-primary" data-bs-toggle="modal" data-bs-target="#createTeamModal">
+      <i class="bi bi-plus-lg me-1"></i> Create Team
+    </button>
+  </div>
+</div>
+
+<div class="container pb-5">
+
+  <!-- Filters -->
+  <div class="sw-card mb-4 p-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5 col-md-4">
+        <label class="form-label small fw-semibold text-muted mb-1">Type</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for key, label in TEAM_TYPES.items() %}
+          <option value="{{ key }}" {% if filter_type==key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-5 col-md-4">
+        <label class="form-label small fw-semibold text-muted mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="open" {% if filter_status=='open' %}selected{% endif %}>Open Teams</option>
+          <option value="closed" {% if filter_status=='closed' %}selected{% endif %}>Closed Teams</option>
+          <option value="" {% if not filter_status %}selected{% endif %}>All Teams</option>
+        </select>
+      </div>
+      <div class="col-sm-2 col-md-2">
+        <button type="submit" class="btn sw-btn-primary btn-sm w-100">Filter</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Team cards grid -->
+  {% if all_teams %}
+  <div class="row g-4">
+    {% for team in all_teams %}
+    <div class="col-sm-6 col-lg-4">
+      <div class="sw-team-card sw-card h-100 {% if team.status=='closed' %}sw-team-closed{% endif %}">
+
+        <!-- Type badge + status -->
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <span class="sw-team-type-badge sw-type-{{ team.team_type }}">
+            <i class="bi {% if team.team_type=='hackathon' %}bi-lightning-charge{% elif team.team_type=='coding_competition' %}bi-code-slash{% elif team.team_type=='project' %}bi-kanban{% else %}bi-people{% endif %} me-1"></i>
+            {{ TEAM_TYPES[team.team_type] }}
+          </span>
+          <span class="sw-status-badge {% if team.status=='open' %}sw-status-open{% else %}sw-status-closed{% endif %}">
+            {{ team.status | capitalize }}
+          </span>
+        </div>
+
+        {% if team.id in my_team_ids %}
+        <span class="badge bg-primary-subtle text-primary mb-2" style="font-size:.68rem"><i class="bi bi-person-check-fill me-1"></i>Your team</span>
+        {% endif %}
+
+        <!-- Team name & description -->
+        <h5 class="fw-bold mb-1">{{ team.name }}</h5>
+        <p class="text-muted small mb-3" style="min-height:2.5rem">
+          {{ team.description[:100] ~ '…' if team.description and team.description|length > 100 else (team.description or 'No description provided.') }}
+        </p>
+
+        <!-- Meta info -->
+        <div class="sw-team-meta mb-3">
+          <span><i class="bi bi-person-fill me-1"></i>{{ team.creator_name }}</span>
+          <span><i class="bi bi-people-fill me-1"></i>{{ team.member_count }}/{{ team.max_members }} members</span>
+          {% if team.event_date %}
+          <span><i class="bi bi-calendar-event me-1"></i>{{ team.event_date }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Member spots bar -->
+        <div class="sw-spots-bar mb-3">
+          <div class="sw-spots-fill" style="width: {{ [(team.member_count / team.max_members * 100)|int, 100]|min }}%"></div>
+        </div>
+        <p class="small text-muted mb-3">
+          {% if team.member_count >= team.max_members %}
+            <span class="text-danger fw-semibold">Team full</span>
+          {% else %}
+            <span class="text-success fw-semibold">{{ team.max_members - team.member_count }} spot(s) left</span>
+          {% endif %}
+        </p>
+
+        <!-- Actions -->
+        <div class="mt-auto d-flex gap-2">
+          <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn sw-btn-ghost btn-sm flex-grow-1">
+            View Team
+          </a>
+          {% if team.id in my_team_ids %}
+            {% if team.status == 'open' %}
+            <a href="{{ url_for('team_chat', team_id=team.id) }}" class="btn sw-btn-primary btn-sm" title="Group chat">
+              <i class="bi bi-chat-square-text-fill"></i>
+            </a>
+            {% endif %}
+            <span class="btn sw-btn-light btn-sm disabled">Joined</span>
+          {% elif team.id in pending_team_ids %}
+            <span class="btn sw-btn-light btn-sm disabled">Requested</span>
+          {% elif team.status == 'open' and team.member_count < team.max_members %}
+            <form method="post" action="{{ url_for('join_team', team_id=team.id) }}">
+              <button type="submit" class="btn sw-btn-primary btn-sm">Join</button>
+            </form>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="text-center py-5">
+    <div class="sw-empty-icon mb-3"><i class="bi bi-people" style="font-size:3rem;color:var(--sw-primary-light)"></i></div>
+    <h5 class="fw-semibold">No teams found</h5>
+    <p class="text-muted">Be the first to create one!</p>
+    <button class="btn sw-btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#createTeamModal">
+      <i class="bi bi-plus-lg me-1"></i> Create Team
+    </button>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ===== Create Team Modal ===== -->
+<div class="modal fade" id="createTeamModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content sw-modal">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-people me-2 text-primary"></i>Create a Team</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{{ url_for('create_team') }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Team Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control sw-input" placeholder="e.g. Code Crushers" required maxlength="80">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Type</label>
+            <select name="team_type" class="form-select sw-input">
+              {% for key, label in TEAM_TYPES.items() %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Description</label>
+            <textarea name="description" class="form-control sw-input" rows="3" placeholder="What's your team about? What skills are you looking for?"></textarea>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Max Members</label>
+              <input type="number" name="max_members" class="form-control sw-input" value="4" min="2" max="20">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Event Date</label>
+              <input type="date" name="event_date" class="form-control sw-input">
+            </div>
+          </div>
+          <button type="submit" class="btn sw-btn-primary w-100">
+            <i class="bi bi-people me-1"></i> Create Team
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
