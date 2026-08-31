@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<section class="sw-page-head">
+  <div class="container">
+    <h1 class="sw-page-title">My profile</h1>
+    <p class="sw-page-sub">Keep your details up to date so classmates know who they're swapping with.</p>
+  </div>
+</section>
+
+<div class="container mb-5">
+  <div class="row g-4">
+
+    <!-- ============ LEFT: PROFILE CARD ============ -->
+    <div class="col-lg-4">
+      <div class="sw-card text-center">
+        <div class="sw-avatar sw-avatar-xl mx-auto" style="background:{{ user.id | avatar_color }}">{{ user.name | initials }}</div>
+
+        <h2 class="mt-3 mb-0">{{ user.name }}</h2>
+        {% if user.role == 'faculty' %}
+        <span class="sw-role-badge sw-role-badge-faculty mt-2 mb-2" title="Faculty"><i class="bi bi-person-workspace"></i> Faculty</span>
+        <p class="text-muted mb-2 mt-2">{{ user.designation or 'Designation not set' }}</p>
+        {% if user.qualifications %}<p class="small text-muted mb-2">{{ user.qualifications }}</p>{% endif %}
+        {% else %}
+        <span class="sw-role-badge sw-role-badge-student mt-2" title="Student"><i class="bi bi-mortarboard"></i> Student</span>
+        <p class="text-muted mb-2 mt-2">{{ user.department or 'Department not set' }}{% if user.year %} · {{ user.year }}{% endif %}</p>
+        {% endif %}
+
+        <div class="sw-rating-pill mx-auto mb-3">
+          <i class="bi bi-star-fill"></i>
+          {{ avg_rating if total_ratings else 'No ratings yet' }}
+          {% if total_ratings %}<span class="text-muted">({{ total_ratings }})</span>{% endif %}
+        </div>
+
+        {% if user.bio %}
+        <p class="sw-bio-text">{{ user.bio }}</p>
+        {% else %}
+        <p class="sw-empty">No bio added yet.</p>
+        {% endif %}
+
+        <hr>
+        <div class="d-flex justify-content-around text-center">
+          <div>
+            <div class="fw-bold fs-5">{{ skills_offered|length }}</div>
+            <div class="small text-muted">{% if user.role == 'faculty' %}Mentorship topics{% else %}Offers{% endif %}</div>
+          </div>
+          {% if user.role != 'faculty' %}
+          <div>
+            <div class="fw-bold fs-5">{{ skills_wanted|length }}</div>
+            <div class="small text-muted">Wants</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ============ RECENT FEEDBACK ============ -->
+      <div class="sw-card mt-4">
+        <h2 class="sw-card-title mb-3"><i class="bi bi-chat-quote text-primary me-2"></i>Recent feedback</h2>
+        {% if recent_feedback %}
+          {% for f in recent_feedback %}
+          <div class="sw-feedback-item">
+            <div class="d-flex justify-content-between">
+              <span class="fw-semibold">{{ f.giver_name }}</span>
+              <span class="sw-stars">{% for i in range(f.stars) %}★{% endfor %}{% for i in range(5 - f.stars) %}☆{% endfor %}</span>
+            </div>
+            {% if f.feedback %}<p class="small text-muted mb-0">"{{ f.feedback }}"</p>{% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+        <p class="sw-empty">No feedback yet &mdash; complete a swap to start collecting reviews.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ============ RIGHT: EDIT FORM ============ -->
+    <div class="col-lg-8">
+      <div class="sw-card">
+        <h2 class="sw-card-title mb-4"><i class="bi bi-pencil-square text-primary me-2"></i>Edit details</h2>
+        <form method="POST" action="{{ url_for('profile') }}" enctype="multipart/form-data">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Full name</label>
+              <input type="text" class="form-control sw-input" name="name" value="{{ user.name }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control sw-input" value="{{ user.email }}" disabled>
+              <div class="form-text">Email can't be changed.</div>
+            </div>
+            {% if user.role == 'faculty' %}
+            <div class="col-md-6">
+              <label class="form-label">Designation</label>
+              <input type="text" class="form-control sw-input" name="designation"
+                     value="{{ user.designation or '' }}" placeholder="Assistant Professor">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Qualifications</label>
+              <input type="text" class="form-control sw-input" name="qualifications"
+                     value="{{ user.qualifications or '' }}" placeholder="Ph.D. in Computer Science">
+            </div>
+            {% else %}
+            <div class="col-md-6">
+              <label class="form-label">Department</label>
+              <select class="form-select sw-input" name="department">
+                <option value="">Select department</option>
+                {% for d in DEPARTMENTS %}
+                <option value="{{ d }}" {% if user.department == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Year</label>
+              <select class="form-select sw-input" name="year">
+                <option value="">Select year</option>
+                {% for y in YEARS %}
+                <option value="{{ y }}" {% if user.year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="col-12">
+              <label class="form-label">Bio</label>
+              <textarea class="form-control sw-input" name="bio" rows="4" placeholder="{% if user.role == 'faculty' %}Tell students a bit about yourself...{% else %}Tell other students a bit about yourself...{% endif %}">{{ user.bio or '' }}</textarea>
+            </div>
+          </div>
+          <button type="submit" class="btn sw-btn-primary px-4 mt-4">Save changes</button>
+        </form>
+      </div>
+
+      <!-- ============ SKILLS SUMMARY ============ -->
+      <div class="row g-4 mt-1">
+        {% if user.role == 'faculty' %}
+        <div class="col-12">
+          <div class="sw-card h-100">
+            <h2 class="sw-card-title mb-3"><i class="bi bi-person-workspace text-primary me-2"></i>Mentorship you give</h2>
+            <div class="d-flex flex-wrap gap-2">
+              {% for s in skills_offered %}
+              <span class="sw-skill-chip sw-chip-offer">{{ s.skill_name }}</span>
+              {% else %}
+              <p class="sw-empty">None added yet.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="col-md-6">
+          <div class="sw-card h-100">
+            <h2 class="sw-card-title mb-3"><i class="bi bi-arrow-up-circle text-primary me-2"></i>Skills you offer</h2>
+            <div class="d-flex flex-wrap gap-2">
+              {% for s in skills_offered %}
+              <span class="sw-skill-chip sw-chip-offer">{{ s.skill_name }}</span>
+              {% else %}
+              <p class="sw-empty">None added yet.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="sw-card h-100">
+            <h2 class="sw-card-title mb-3"><i class="bi bi-arrow-down-circle text-info me-2"></i>Skills you want</h2>
+            <div class="d-flex flex-wrap gap-2">
+              {% for s in skills_wanted %}
+              <span class="sw-skill-chip sw-chip-want">{{ s.skill_name }}</span>
+              {% else %}
+              <p class="sw-empty">None added yet.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      <p class="text-center mt-3"><a href="{{ url_for('dashboard') }}" class="sw-link-sm">Manage {% if user.role == 'faculty' %}mentorship topics{% else %}skills{% endif %} from your dashboard &rarr;</a></p>
+
+      <!-- ============ ACCOUNT SWITCHER ============ -->
+      <div class="sw-card mt-4">
+        <h2 class="sw-card-title mb-1"><i class="bi bi-people text-primary me-2"></i>Switch account</h2>
+        <p class="small text-muted mb-3">Stay signed in to multiple SkillSwap accounts on this browser and switch between them without re-entering a password.</p>
+
+        <div class="sw-account-switch-list">
+          <div class="sw-account-row sw-account-row-active">
+            <span class="sw-avatar sw-avatar-sm" style="background:{{ user.id | avatar_color }}">{{ user.name | initials }}</span>
+            <div class="sw-account-row-meta">
+              <div class="fw-semibold">{{ user.name }}</div>
+              <div class="small text-muted">{{ user.email }}</div>
+            </div>
+            <span class="badge sw-badge-active">Active</span>
+          </div>
+
+          {% for acc in saved_accounts %}
+          <div class="sw-account-row">
+            <span class="sw-avatar sw-avatar-sm" style="background:{{ acc.id | avatar_color }}">{{ acc.name | initials }}</span>
+            <div class="sw-account-row-meta">
+              <div class="fw-semibold">{{ acc.name }}</div>
+              <div class="small text-muted">{{ acc.email }}</div>
+            </div>
+            <a href="{{ url_for('switch_account', user_id=acc.id) }}" class="btn btn-sm sw-btn-ghost">Switch to</a>
+            <form method="POST" action="{{ url_for('remove_account', user_id=acc.id) }}" onsubmit="return confirm('Remove this account from the switcher? You can always log back in.');">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove from this browser"><i class="bi bi-x-lg"></i></button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% if can_add_account %}
+          <a href="{{ url_for('login', add=1) }}" class="btn btn-sm sw-btn-ghost"><i class="bi bi-person-plus me-1"></i>Add another account</a>
+          {% endif %}
+          {% if saved_accounts %}
+          <a href="{{ url_for('logout_all') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-left me-1"></i>Logout of all accounts</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ============ DANGER ZONE ============ -->
+      <div class="sw-card mt-4 border border-danger-subtle">
+        <h2 class="sw-card-title mb-2 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Danger zone</h2>
+        <p class="small text-muted mb-3">
+          Deleting your profile is permanent. It removes your account, skills, requests,
+          ratings, chats, and team memberships. This cannot be undone.
+        </p>
+
+        {% if not (request.args.get('delete') == '1') %}
+        <a href="{{ url_for('profile', delete=1) }}" class="btn btn-outline-danger">
+          <i class="bi bi-trash3 me-1"></i> Delete my profile
+        </a>
+        {% else %}
+        <form method="POST" action="{{ url_for('delete_profile') }}"
+              onsubmit="return confirm('This will permanently delete your account. Are you absolutely sure?');">
+          <label class="form-label">Enter your password to confirm</label>
+          <div class="d-flex flex-wrap gap-2">
+            <input type="password" class="form-control sw-input" style="max-width:260px" name="password" required placeholder="Your password">
+            <button type="submit" class="btn btn-danger">Yes, delete my profile</button>
+            <a href="{{ url_for('profile') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
