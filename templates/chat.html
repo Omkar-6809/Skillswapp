@@ -1,0 +1,742 @@
+{% extends "base.html" %}
+{% block title %}Chat{% endblock %}
+
+{% block extra_head %}
+<style>
+.sw-chat-wrap      { height: calc(100vh - 68px); display: flex; overflow: hidden; }
+.sw-conv-list      { width: 300px; min-width: 300px; border-right: 1px solid var(--sw-border);
+                     overflow-y: auto; background: var(--sw-white); display: flex; flex-direction: column; }
+.sw-conv-list-head { padding: 1.1rem 1.2rem; border-bottom: 1px solid var(--sw-border);
+                     font-weight: 700; font-size: 1.05rem; color: var(--sw-ink); }
+.sw-conv-item      { display: flex; align-items: center; gap: .75rem; padding: .85rem 1.2rem;
+                     border-bottom: 1px solid var(--sw-border); cursor: pointer; text-decoration: none;
+                     color: inherit; transition: background .12s; }
+.sw-conv-item:hover,
+.sw-conv-item.active { background: var(--sw-primary-light); }
+.sw-conv-meta      { flex: 1; min-width: 0; }
+.sw-conv-name      { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--sw-ink); }
+.sw-role-icon      { font-size: .78rem; margin-left: .2rem; vertical-align: middle; }
+.sw-role-icon-student { color: var(--sw-primary); }
+.sw-role-icon-faculty { color: #6d28d9; }
+.sw-conv-preview   { font-size: .78rem; color: var(--sw-slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sw-chat-main      { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--sw-bg); }
+.sw-chat-header    { padding: .9rem 1.4rem; border-bottom: 1px solid var(--sw-border);
+                     background: var(--sw-white); display: flex; align-items: center; gap: .75rem; }
+.sw-chat-messages  { flex: 1; overflow-y: auto; padding: 1.2rem 1.4rem;
+                     display: flex; flex-direction: column; gap: .35rem; }
+.sw-bubble-row     { display: flex; align-items: flex-end; gap: .4rem; position: relative; }
+.sw-bubble-row.mine { flex-direction: row-reverse; }
+.sw-bubble-col     { max-width: 65%; display: flex; flex-direction: column; }
+.sw-bubble-row.mine .sw-bubble-col { align-items: flex-end; }
+.sw-bubble-row:not(.mine) .sw-bubble-col { align-items: flex-start; }
+.sw-bubble         { padding: .6rem .95rem; border-radius: 18px;
+                     font-size: .9rem; line-height: 1.5; word-break: break-word; position: relative; }
+.sw-bubble.mine    { background: var(--sw-primary); color: #fff; border-bottom-right-radius: 4px; }
+.sw-bubble.theirs  { background: var(--sw-white); border: 1px solid var(--sw-border);
+                     color: var(--sw-ink); border-bottom-left-radius: 4px; }
+.sw-bubble.deleted { font-style: italic; opacity: .7; }
+.sw-bubble-content { white-space: pre-wrap; }
+.sw-bubble-edited-tag { font-size: .65rem; opacity: .7; margin-left: .35rem; }
+.sw-bubble-time    { font-size: .68rem; color: var(--sw-muted); white-space: nowrap; }
+.sw-bubble-footer  { display: flex; align-items: center; gap: .4rem; margin-top: 2px; }
+.sw-bubble-row.mine .sw-bubble-footer { flex-direction: row-reverse; }
+
+/* Reply preview shown INSIDE a bubble (quoting the message being replied to) */
+.sw-reply-quote    { border-left: 3px solid rgba(0,0,0,.2); padding: .25rem .55rem; margin-bottom: .35rem;
+                     border-radius: 6px; font-size: .78rem; background: rgba(0,0,0,.05); cursor: pointer; }
+.sw-bubble.mine .sw-reply-quote { border-left-color: rgba(255,255,255,.6); background: rgba(255,255,255,.15); }
+.sw-reply-quote-sender { font-weight: 700; display: block; }
+.sw-reply-quote-text { opacity: .85; display: block; overflow: hidden; text-overflow: ellipsis;
+                        white-space: nowrap; max-width: 240px; }
+
+/* Reactions row under a bubble */
+.sw-reactions-row  { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .3rem; }
+.sw-reaction-chip  { display: inline-flex; align-items: center; gap: .25rem; font-size: .74rem;
+                     background: var(--sw-white); border: 1px solid var(--sw-border); border-radius: 99px;
+                     padding: .1rem .5rem; cursor: pointer; line-height: 1.6; }
+.sw-reaction-chip:hover { background: var(--sw-primary-light); }
+.sw-reaction-chip.mine  { background: var(--sw-primary-light); border-color: var(--sw-primary); }
+
+/* Hover toolbar: react / reply / edit / unsend / delete-for-me / report */
+.sw-bubble-toolbar { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity .12s;
+                     background: var(--sw-white); border: 1px solid var(--sw-border); border-radius: 99px;
+                     padding: 2px; box-shadow: var(--sw-shadow-sm); position: relative; }
+.sw-bubble-row:hover .sw-bubble-toolbar,
+.sw-bubble-toolbar.sw-toolbar-pinned { opacity: 1; }
+.sw-toolbar-btn    { border: none; background: transparent; width: 28px; height: 28px; border-radius: 50%;
+                     display: flex; align-items: center; justify-content: center; color: var(--sw-slate);
+                     cursor: pointer; font-size: .85rem; }
+.sw-toolbar-btn:hover { background: var(--sw-bg-2); color: var(--sw-ink); }
+.sw-toolbar-btn.text-danger:hover { background: var(--sw-danger-bg); }
+
+/* Emoji picker popover */
+.sw-emoji-picker   { position: absolute; bottom: 100%; margin-bottom: 6px; background: var(--sw-white);
+                     border: 1px solid var(--sw-border); border-radius: 99px; box-shadow: var(--sw-shadow-md);
+                     padding: .3rem .4rem; display: none; gap: 2px; z-index: 20; white-space: nowrap; }
+.sw-emoji-picker.show { display: inline-flex; }
+.sw-bubble-row.mine .sw-emoji-picker { right: 0; }
+.sw-bubble-row:not(.mine) .sw-emoji-picker { left: 0; }
+.sw-emoji-opt      { border: none; background: transparent; font-size: 1.1rem; padding: .15rem .3rem;
+                     border-radius: 50%; cursor: pointer; line-height: 1; }
+.sw-emoji-opt:hover { background: var(--sw-bg-2); transform: scale(1.15); }
+
+.sw-chat-input     { padding: .9rem 1.2rem; border-top: 1px solid var(--sw-border);
+                     background: var(--sw-white); display: flex; flex-direction: column; gap: .5rem; }
+.sw-chat-input-row { display: flex; gap: .6rem; align-items: flex-end; }
+.sw-chat-input textarea { flex: 1; resize: none; border-radius: 22px; padding: .6rem 1rem;
+                           border: 1.5px solid var(--sw-border); font-size: .9rem; max-height: 120px;
+                           line-height: 1.4; overflow-y: auto; background: var(--sw-bg); color: var(--sw-ink); }
+.sw-chat-input textarea:focus { outline: none; border-color: var(--sw-primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.sw-chat-input textarea::placeholder { color: var(--sw-muted); }
+.sw-send-btn       { width: 42px; height: 42px; border-radius: 50%; border: none; flex-shrink: 0;
+                     background: var(--sw-primary); color: #fff; display: flex; align-items: center;
+                     justify-content: center; cursor: pointer; transition: all .18s;
+                     box-shadow: 0 2px 8px rgba(37,99,235,.3); }
+.sw-send-btn:hover { background: var(--sw-primary-dark); transform: scale(1.06); }
+.sw-chat-empty     { flex: 1; display: flex; flex-direction: column; align-items: center;
+                     justify-content: center; color: var(--sw-slate); gap: .5rem; }
+.sw-moderation-err { color: #b91c1c; font-size: .82rem; padding: .3rem .75rem;
+                     background: var(--sw-danger-bg); border: 1px solid #fecaca; border-radius: 8px; }
+.sw-avatar-group   { background: var(--sw-primary) !important; }
+.sw-bubble-sender  { font-size: .7rem; font-weight: 700; color: var(--sw-primary); margin-bottom: 2px; }
+.sw-group-badge    { font-size: .62rem; font-weight: 700; padding: .1rem .45rem; border-radius: 99px;
+                     background: var(--sw-primary-light); color: #1e40af; text-transform: uppercase;
+                     letter-spacing: .03em; vertical-align: middle; }
+
+/* Reply-composer banner above the input box */
+.sw-reply-banner   { display: none; align-items: center; gap: .6rem; background: var(--sw-bg-2);
+                     border-left: 3px solid var(--sw-primary); border-radius: 8px; padding: .4rem .7rem; font-size: .8rem; }
+.sw-reply-banner.show { display: flex; }
+.sw-reply-banner-body { flex: 1; min-width: 0; }
+.sw-reply-banner-sender { font-weight: 700; color: var(--sw-primary); display: block; }
+.sw-reply-banner-text { color: var(--sw-slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.sw-reply-banner-close { border: none; background: transparent; color: var(--sw-muted); font-size: 1rem; line-height: 1; cursor: pointer; }
+
+/* Inline edit mode */
+.sw-bubble-edit-box { display: flex; flex-direction: column; gap: .4rem; min-width: 220px; }
+.sw-bubble-edit-box textarea { border-radius: 10px; border: 1px solid var(--sw-border); padding: .4rem .6rem;
+                                font-size: .85rem; resize: vertical; color: var(--sw-ink); }
+.sw-bubble-edit-actions { display: flex; gap: .4rem; justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .sw-conv-list { width: 100%; min-width: 100%; {% if active_conv %}display:none;{% endif %} }
+  .sw-chat-main { {% if not active_conv %}display:none;{% endif %} }
+  .sw-bubble-col { max-width: 82%; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sw-chat-wrap">
+
+  <!-- ===== Conversation list ===== -->
+  <div class="sw-conv-list">
+    <div class="sw-conv-list-head"><i class="bi bi-chat-dots me-2 text-primary"></i>Messages</div>
+    {% if convs %}
+      {% for c in convs %}
+      {% if c.kind == 'group' %}
+      <a href="{{ url_for('team_chat', team_id=c.team_id) }}"
+         class="sw-conv-item {% if active_conv == c.id %}active{% endif %}">
+        <span class="sw-avatar sw-avatar-sm sw-avatar-group"><i class="bi bi-chat-square-text-fill"></i></span>
+        <div class="sw-conv-meta">
+          <div class="sw-conv-name">{{ c.name }} <span class="sw-group-badge">Group</span></div>
+          <div class="sw-conv-preview">{{ c.last_msg or (c.member_count ~ ' members · say hi!') }}</div>
+        </div>
+      </a>
+      {% else %}
+      <a href="{{ url_for('chat_with', other_id=c.other_id) }}"
+         class="sw-conv-item {% if active_conv == c.id %}active{% endif %}">
+        {% if c.pic %}
+          <img src="{{ url_for('static', filename='images/uploads/' ~ c.pic) }}"
+               class="sw-avatar sw-avatar-sm sw-avatar-img" alt="{{ c.name }}" loading="lazy" decoding="async" width="36" height="36">
+        {% else %}
+          <span class="sw-avatar sw-avatar-sm" style="background:{{ c.other_id | avatar_color }}">
+            {{ c.name | initials }}
+          </span>
+        {% endif %}
+        <div class="sw-conv-meta">
+          <div class="sw-conv-name">
+            {{ c.name }}
+            {% if c.role == 'faculty' %}
+            <i class="bi bi-person-workspace sw-role-icon sw-role-icon-faculty" title="Faculty"></i>
+            {% else %}
+            <i class="bi bi-mortarboard sw-role-icon sw-role-icon-student" title="Student"></i>
+            {% endif %}
+          </div>
+          <div class="sw-conv-preview">{{ c.last_msg or 'Start the conversation…' }}</div>
+        </div>
+      </a>
+      {% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="p-4 text-center text-muted small">
+        No conversations yet.<br>Go to <a href="{{ url_for('search') }}">Search</a> or
+        <a href="{{ url_for('matches') }}">Matches</a> and click <strong>Message</strong> to start chatting,
+        or join an open <a href="{{ url_for('teams') }}">team</a> to unlock its group chat.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ===== Chat window ===== -->
+  <div class="sw-chat-main">
+    {% if other or group_team %}
+      <!-- Header -->
+      <div class="sw-chat-header">
+        <a href="{{ url_for('chat') }}" class="d-lg-none btn sw-btn-ghost btn-sm me-1 p-1">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        {% if group_team %}
+          <span class="sw-avatar sw-avatar-sm sw-avatar-group"><i class="bi bi-chat-square-text-fill"></i></span>
+          <div>
+            <div class="fw-semibold">{{ group_team.name }} <span class="sw-group-badge">Group</span></div>
+            <div class="small text-muted">{{ member_count }} member{{ 's' if member_count != 1 else '' }}</div>
+          </div>
+        {% else %}
+          {% if other.profile_picture %}
+            <img src="{{ url_for('static', filename='images/uploads/' ~ other.profile_picture) }}"
+                 class="sw-avatar sw-avatar-sm sw-avatar-img" alt="{{ other.name }}" decoding="async" width="36" height="36">
+          {% else %}
+            <span class="sw-avatar sw-avatar-sm" style="background:{{ other.id | avatar_color }}">
+              {{ other.name | initials }}
+            </span>
+          {% endif %}
+          <div>
+            <div class="fw-semibold">
+              {{ other.name }}
+              {% if other.role == 'faculty' %}
+              <i class="bi bi-person-workspace sw-role-icon sw-role-icon-faculty" title="Faculty"></i>
+              {% else %}
+              <i class="bi bi-mortarboard sw-role-icon sw-role-icon-student" title="Student"></i>
+              {% endif %}
+            </div>
+            <div class="small text-muted">{{ other.department or '' }}{% if other.year %} · {{ other.year }}{% endif %}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Messages -->
+      <div class="sw-chat-messages" id="msgList"></div>
+
+      <!-- Moderation error display -->
+      <div id="moderationErr" class="px-3 pb-1" style="display:none">
+        <span class="sw-moderation-err"><i class="bi bi-exclamation-triangle me-1"></i>
+          <span id="moderationErrText"></span>
+        </span>
+      </div>
+
+      <!-- Input -->
+      <div class="sw-chat-input">
+        <div class="sw-reply-banner" id="replyBanner">
+          <div class="sw-reply-banner-body">
+            <span class="sw-reply-banner-sender" id="replyBannerSender"></span>
+            <span class="sw-reply-banner-text" id="replyBannerText"></span>
+          </div>
+          <button type="button" class="sw-reply-banner-close" id="replyBannerClose" title="Cancel reply">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="sw-chat-input-row">
+          <textarea id="msgInput" placeholder="Type a message… (Enter to send)"
+                    rows="1" maxlength="1000"></textarea>
+          <button class="sw-send-btn" id="sendBtn" title="Send">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="sw-chat-empty">
+        <i class="bi bi-chat-dots" style="font-size:3rem;color:var(--sw-primary-light)"></i>
+        <p class="mb-0 fw-semibold">Select a conversation</p>
+        <p class="small">or find someone in <a href="{{ url_for('search') }}">Search</a></p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ===== Report message modal ===== -->
+{% if other or group_team %}
+<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-flag text-danger me-2"></i>Report message</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Let us know what's wrong with this message. Our team will review it.</p>
+        <div class="mb-3">
+          <label class="form-label">Reason</label>
+          <select class="form-select sw-input" id="reportReason">
+            {% for key, label in REPORT_REASONS.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Additional details (optional)</label>
+          <textarea class="form-control sw-input" id="reportDetails" rows="3" maxlength="500" placeholder="Anything else we should know?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn sw-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="reportSubmitBtn"><i class="bi bi-flag me-1"></i>Submit report</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if (other or group_team) and active_conv %}
+<script id="initialMessages" type="application/json">{{ messages | tojson }}</script>
+<script>
+(function () {
+  const CONV_ID    = {{ active_conv }};
+  const MY_ID      = {{ session.user_id }};
+  const IS_GROUP   = {{ 'true' if group_team else 'false' }};
+  const EMOJIS     = {{ REACTION_EMOJIS | tojson }};
+  const sendUrl    = "{{ url_for('send_message', conv_id=active_conv) }}";
+  const pollUrl    = "{{ url_for('poll_messages', conv_id=active_conv) }}";
+
+  const msgList    = document.getElementById('msgList');
+  const input      = document.getElementById('msgInput');
+  const sendBtn    = document.getElementById('sendBtn');
+  const errBox     = document.getElementById('moderationErr');
+  const errText    = document.getElementById('moderationErrText');
+  const replyBanner       = document.getElementById('replyBanner');
+  const replyBannerSender = document.getElementById('replyBannerSender');
+  const replyBannerText   = document.getElementById('replyBannerText');
+  const replyBannerClose  = document.getElementById('replyBannerClose');
+  const reportModalEl     = document.getElementById('reportModal');
+  const reportReasonSel   = document.getElementById('reportReason');
+  const reportDetailsBox  = document.getElementById('reportDetails');
+  const reportSubmitBtn   = document.getElementById('reportSubmitBtn');
+  const reportModal       = reportModalEl ? bootstrap.Modal.getOrCreateInstance(reportModalEl) : null;
+
+  const messages   = {};   // id -> message object currently rendered
+  let lastId       = 0;
+  let replyingTo   = null; // { id, sender_name, content }
+  let reportingId  = null;
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+              .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function scrollBottom(smooth) {
+    msgList.scrollTo({ top: msgList.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  // Posts form data and always resolves to a plain object with an `ok`
+  // field -- callers never need to worry about a non-JSON response (e.g.
+  // a proxy timeout page) throwing an unhandled parse error.
+  async function postAction(url, body) {
+    const fd = new FormData();
+    Object.keys(body || {}).forEach(k => fd.append(k, body[k]));
+    let resp;
+    try {
+      resp = await fetch(url, { method: 'POST', body: fd });
+    } catch (e) {
+      return { ok: false, error: 'offline', message: "Couldn't reach the server. Check your connection and try again." };
+    }
+    let data;
+    try {
+      data = await resp.json();
+    } catch (e) {
+      return { ok: false, error: 'bad_response', message: 'Something went wrong on our end. Please try again.' };
+    }
+    if (data.error === 'auth_required') {
+      window.location.href = "{{ url_for('login') }}";
+    }
+    return data;
+  }
+  // Back-compat alias used by the reaction/edit/report handlers below.
+  const csrfSafeFetch = postAction;
+
+  // ---- Build (or rebuild) one bubble row from a message object ----
+  function renderRow(msg) {
+    const isMine   = msg.sender_id === MY_ID;
+    const reactions = msg.reactions || {};
+    const isDeleted = !!msg.deleted;
+
+    let row = msgList.querySelector('[data-id="' + msg.id + '"]');
+    if (!row) {
+      row = document.createElement('div');
+      row.dataset.id = msg.id;
+      msgList.appendChild(row);
+    }
+    row.className = 'sw-bubble-row' + (isMine ? ' mine' : '');
+
+    const time = msg.created_at ? msg.created_at.substring(11, 16) : '';
+    const senderRoleIcon = msg.sender_role === 'faculty'
+      ? '<i class="bi bi-person-workspace sw-role-icon sw-role-icon-faculty" title="Faculty"></i>'
+      : '<i class="bi bi-mortarboard sw-role-icon sw-role-icon-student" title="Student"></i>';
+    const senderLine = (IS_GROUP && !isMine && msg.sender_name)
+      ? `<div class="sw-bubble-sender">${escHtml(msg.sender_name)} ${senderRoleIcon}</div>` : '';
+
+    let replyHtml = '';
+    if (msg.reply_to && msg.reply_preview) {
+      replyHtml = `<div class="sw-reply-quote" data-jump="${msg.reply_to}">
+        <span class="sw-reply-quote-sender">${escHtml(msg.reply_preview.sender_name)}</span>
+        <span class="sw-reply-quote-text">${escHtml(msg.reply_preview.content)}</span>
+      </div>`;
+    }
+
+    const editedTag = (msg.edited && !isDeleted) ? '<span class="sw-bubble-edited-tag">(edited)</span>' : '';
+
+    let reactionsHtml = '';
+    const chips = Object.keys(reactions).filter(e => reactions[e] && reactions[e].length);
+    if (chips.length) {
+      reactionsHtml = '<div class="sw-reactions-row">' + chips.map(e => {
+        const mine = reactions[e].includes(MY_ID);
+        return `<button type="button" class="sw-reaction-chip ${mine ? 'mine' : ''}" data-react="${e}">
+          <span>${e}</span><span>${reactions[e].length}</span></button>`;
+      }).join('') + '</div>';
+    }
+
+    const toolbarBtns = [];
+    toolbarBtns.push(`<button type="button" class="sw-toolbar-btn" data-action="react" title="React">
+      <i class="bi bi-emoji-smile"></i></button>`);
+    if (!isDeleted) {
+      toolbarBtns.push(`<button type="button" class="sw-toolbar-btn" data-action="reply" title="Reply">
+        <i class="bi bi-reply-fill"></i></button>`);
+    }
+    if (isMine && !isDeleted) {
+      toolbarBtns.push(`<button type="button" class="sw-toolbar-btn" data-action="edit" title="Edit">
+        <i class="bi bi-pencil"></i></button>`);
+      toolbarBtns.push(`<button type="button" class="sw-toolbar-btn text-danger" data-action="unsend" title="Unsend (delete for everyone)">
+        <i class="bi bi-trash3"></i></button>`);
+    }
+    toolbarBtns.push(`<button type="button" class="sw-toolbar-btn" data-action="delete-for-me" title="Delete for me">
+      <i class="bi bi-eye-slash"></i></button>`);
+    if (!isMine) {
+      toolbarBtns.push(`<button type="button" class="sw-toolbar-btn text-danger" data-action="report" title="Report">
+        <i class="bi bi-flag"></i></button>`);
+    }
+
+    row.innerHTML = `
+      <div class="sw-bubble-col">
+        <div class="sw-bubble ${isMine ? 'mine' : 'theirs'} ${isDeleted ? 'deleted' : ''}">
+          ${senderLine}
+          ${replyHtml}
+          <span class="sw-bubble-content">${isDeleted ? '<i class="bi bi-slash-circle me-1"></i>Message unsent' : escHtml(msg.content)}</span>
+          ${editedTag}
+        </div>
+        ${reactionsHtml}
+        <div class="sw-bubble-footer">
+          <span class="sw-bubble-time">${time}</span>
+          <div class="sw-bubble-toolbar">
+            ${toolbarBtns.join('')}
+            <div class="sw-emoji-picker">
+              ${EMOJIS.map(e => `<button type="button" class="sw-emoji-opt" data-emoji="${e}">${e}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    messages[msg.id] = msg;
+    if (msg.id > lastId) lastId = msg.id;
+    return row;
+  }
+
+  function appendAndScroll(msg) {
+    renderRow(msg);
+    scrollBottom(true);
+  }
+
+  // ---- Initial render ----
+  try {
+    const initial = JSON.parse(document.getElementById('initialMessages').textContent || '[]');
+    initial.forEach(renderRow);
+  } catch (e) { /* no-op */ }
+  scrollBottom(false);
+
+  // ---- Reply composer ----
+  function startReply(id) {
+    const msg = messages[id];
+    if (!msg || msg.deleted) return;
+    replyingTo = { id: msg.id, sender_name: msg.sender_id === MY_ID ? 'You' : msg.sender_name, content: msg.content };
+    replyBannerSender.textContent = 'Replying to ' + replyingTo.sender_name;
+    replyBannerText.textContent = replyingTo.content;
+    replyBanner.classList.add('show');
+    input.focus();
+  }
+  function clearReply() {
+    replyingTo = null;
+    replyBanner.classList.remove('show');
+  }
+  replyBannerClose.addEventListener('click', clearReply);
+
+  // ---- Inline edit ----
+  function startEdit(id) {
+    const msg = messages[id];
+    if (!msg || msg.sender_id !== MY_ID || msg.deleted) return;
+    const row = msgList.querySelector('[data-id="' + id + '"]');
+    const bubble = row.querySelector('.sw-bubble');
+    bubble.innerHTML = `
+      <div class="sw-bubble-edit-box">
+        <textarea maxlength="1000">${escHtml(msg.content)}</textarea>
+        <div class="sw-bubble-edit-actions">
+          <button type="button" class="btn btn-sm sw-btn-ghost" data-edit-cancel>Cancel</button>
+          <button type="button" class="btn btn-sm sw-btn-primary" data-edit-save>Save</button>
+        </div>
+      </div>`;
+    const ta = bubble.querySelector('textarea');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    bubble.querySelector('[data-edit-cancel]').addEventListener('click', () => renderRow(msg));
+    bubble.querySelector('[data-edit-save]').addEventListener('click', async () => {
+      const content = ta.value.trim();
+      if (!content) return;
+      const data = await csrfSafeFetch(`/chat/message/${id}/edit`, { content });
+      if (data.ok) {
+        msg.content = data.content;
+        msg.edited = 1;
+        renderRow(msg);
+      } else {
+        errText.textContent = data.error || 'Could not edit message.';
+        errBox.style.display = 'block';
+        renderRow(msg);
+      }
+    });
+  }
+
+  // ---- Report ----
+  function openReport(id) {
+    reportingId = id;
+    reportReasonSel.selectedIndex = 0;
+    reportDetailsBox.value = '';
+    if (reportModal) reportModal.show();
+  }
+  if (reportSubmitBtn) {
+    reportSubmitBtn.addEventListener('click', async () => {
+      if (!reportingId) return;
+      const data = await csrfSafeFetch(`/chat/message/${reportingId}/report`, {
+        reason: reportReasonSel.value, details: reportDetailsBox.value.trim()
+      });
+      if (reportModal) reportModal.hide();
+      if (data.ok) {
+        errText.textContent = 'Thanks — this message has been reported to our team.';
+        errBox.style.display = 'block';
+      } else {
+        errText.textContent = data.error || 'Could not submit report.';
+        errBox.style.display = 'block';
+      }
+      reportingId = null;
+      setTimeout(() => { errBox.style.display = 'none'; }, 3500);
+    });
+  }
+
+  // ---- Delegated click handling for bubble toolbars / reactions ----
+  msgList.addEventListener('click', async function (e) {
+    const row = e.target.closest('.sw-bubble-row');
+    if (!row) return;
+    const id = parseInt(row.dataset.id, 10);
+
+    // Tap the timestamp to pin the action toolbar open (handy on touch devices)
+    const timeEl = e.target.closest('.sw-bubble-time');
+    if (timeEl) {
+      const toolbar = row.querySelector('.sw-bubble-toolbar');
+      document.querySelectorAll('.sw-bubble-toolbar.sw-toolbar-pinned').forEach(t => {
+        if (t !== toolbar) t.classList.remove('sw-toolbar-pinned');
+      });
+      toolbar.classList.toggle('sw-toolbar-pinned');
+      return;
+    }
+
+    // Jump to quoted message
+    const quote = e.target.closest('.sw-reply-quote');
+    if (quote) {
+      const targetId = parseInt(quote.dataset.jump, 10);
+      const targetRow = msgList.querySelector('[data-id="' + targetId + '"]');
+      if (targetRow) {
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetRow.style.transition = 'background .3s';
+        targetRow.style.background = 'var(--sw-primary-light)';
+        setTimeout(() => { targetRow.style.background = ''; }, 900);
+      }
+      return;
+    }
+
+    // Reaction chip toggle (already-placed reaction)
+    const chip = e.target.closest('[data-react]');
+    if (chip) {
+      const emoji = chip.dataset.react;
+      const data = await csrfSafeFetch(`/chat/message/${id}/react`, { emoji });
+      if (data.ok) { messages[id].reactions = data.reactions; renderRow(messages[id]); }
+      return;
+    }
+
+    // Emoji picker option
+    const emojiOpt = e.target.closest('.sw-emoji-opt');
+    if (emojiOpt) {
+      const emoji = emojiOpt.dataset.emoji;
+      const data = await csrfSafeFetch(`/chat/message/${id}/react`, { emoji });
+      if (data.ok) { messages[id].reactions = data.reactions; renderRow(messages[id]); }
+      return;
+    }
+
+    // Toolbar action buttons
+    const actionBtn = e.target.closest('[data-action]');
+    if (actionBtn) {
+      const action = actionBtn.dataset.action;
+      if (action === 'react') {
+        const picker = row.querySelector('.sw-emoji-picker');
+        document.querySelectorAll('.sw-emoji-picker.show').forEach(p => { if (p !== picker) p.classList.remove('show'); });
+        picker.classList.toggle('show');
+        return;
+      }
+      if (action === 'reply') { startReply(id); return; }
+      if (action === 'edit') { startEdit(id); return; }
+      if (action === 'unsend') {
+        if (!confirm('Unsend this message? It will be removed for everyone in this chat.')) return;
+        const data = await csrfSafeFetch(`/chat/message/${id}/delete`, {});
+        if (data.ok) { messages[id].deleted = 1; messages[id].content = '[Message deleted]'; renderRow(messages[id]); }
+        return;
+      }
+      if (action === 'delete-for-me') {
+        if (!confirm('Delete this message just for you? It will stay visible to others.')) return;
+        const data = await csrfSafeFetch(`/chat/message/${id}/delete-for-me`, {});
+        if (data.ok) { row.remove(); delete messages[id]; }
+        return;
+      }
+      if (action === 'report') { openReport(id); return; }
+    }
+  });
+
+  // Close any open emoji picker when clicking elsewhere
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.sw-bubble-toolbar')) {
+      document.querySelectorAll('.sw-emoji-picker.show').forEach(p => p.classList.remove('show'));
+    }
+  });
+
+  // ---- Send message (optimistic: shows immediately, reconciles after) ----
+  let tempSeq = 0;
+
+  function renderPending(tempId, text, replySnapshot) {
+    const row = document.createElement('div');
+    row.dataset.id = tempId;
+    row.className = 'sw-bubble-row mine';
+    row.innerHTML = `
+      <div class="sw-bubble-col">
+        <div class="sw-bubble mine" style="opacity:.65">
+          <span class="sw-bubble-content">${escHtml(text)}</span>
+        </div>
+        <div class="sw-bubble-footer">
+          <span class="sw-bubble-time"><i class="bi bi-clock-history"></i></span>
+        </div>
+      </div>`;
+    msgList.appendChild(row);
+    return row;
+  }
+
+  function renderFailed(row, text) {
+    row.querySelector('.sw-bubble').style.opacity = '1';
+    row.querySelector('.sw-bubble-content').innerHTML =
+      escHtml(text) + '<br><span style="color:#fecaca;font-size:.72rem"><i class="bi bi-exclamation-triangle"></i> Not sent — tap to retry</span>';
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function retryOnce() {
+      row.removeEventListener('click', retryOnce);
+      row.remove();
+      doSend(text, null);
+    }, { once: true });
+  }
+
+  async function doSend(text, replyTo) {
+    const tempId = 'tmp-' + (++tempSeq);
+    const row = renderPending(tempId, text, replyTo);
+    scrollBottom(true);
+
+    const body = { content: text };
+    if (replyTo) body.reply_to = replyTo;
+
+    const data = await postAction(sendUrl, body);
+    const stillThere = msgList.querySelector('[data-id="' + tempId + '"]');
+
+    if (data.ok) {
+      data.reactions = data.reactions || {};
+      if (stillThere) stillThere.remove();
+      renderRow(data);
+      scrollBottom(true);
+    } else if (data.error !== 'auth_required') {
+      errText.textContent = data.message || data.error || 'Message could not be sent.';
+      errBox.style.display = 'block';
+      setTimeout(() => { errBox.style.display = 'none'; }, 4000);
+      if (stillThere) renderFailed(stillThere, text);
+    }
+  }
+
+  function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    errBox.style.display = 'none';
+    input.value = '';
+    input.style.height = 'auto';
+    const replyTo = replyingTo ? replyingTo.id : null;
+    clearReply();
+
+    doSend(text, replyTo);
+  }
+
+  // ---- Poll for new / updated messages ----
+  let pollTimer = null;
+  let pollInFlight = false;
+
+  async function poll() {
+    if (pollInFlight || document.hidden) return;
+    pollInFlight = true;
+    try {
+      const resp = await fetch(pollUrl + '?after=' + lastId);
+      if (resp.status === 401) { window.location.href = "{{ url_for('login') }}"; return; }
+      if (!resp.ok) return;
+      const msgs = await resp.json();
+      const wasAtBottom = msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight < 80;
+      msgs.forEach(m => {
+        const isNew = !messages[m.id];
+        renderRow(m);
+        if (isNew && wasAtBottom) scrollBottom(true);
+      });
+    } catch (e) {
+      // Transient network hiccup -- just try again on the next tick.
+    } finally {
+      pollInFlight = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollTimer) return;
+    poll();
+    pollTimer = setInterval(poll, 8000);
+  }
+  function stopPolling() {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  // Pause polling while the tab/app isn't visible (saves battery and data
+  // on mobile), and catch up immediately the moment it's visible again.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopPolling(); else startPolling();
+  });
+  startPolling();
+
+  // ---- Auto-resize textarea ----
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // ---- Enter to send (Shift+Enter for newline) ----
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+})();
+</script>
+{% endif %}
+{% endblock %}
