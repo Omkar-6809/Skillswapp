@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }}{% endblock %}
+
+{% block content %}
+<div class="container pb-5 pt-4">
+
+  <!-- Back link -->
+  <a href="{{ url_for('teams') }}" class="btn sw-btn-ghost btn-sm mb-4">
+    <i class="bi bi-arrow-left me-1"></i> Back to Teams
+  </a>
+
+  <div class="row g-4">
+
+    <!-- ===== Left: Team info ===== -->
+    <div class="col-lg-4">
+      <div class="sw-card p-4 mb-4">
+
+        <!-- Type + status -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="sw-team-type-badge sw-type-{{ team.team_type }}">
+            <i class="bi {% if team.team_type=='hackathon' %}bi-lightning-charge{% elif team.team_type=='coding_competition' %}bi-code-slash{% elif team.team_type=='project' %}bi-kanban{% else %}bi-people{% endif %} me-1"></i>
+            {{ TEAM_TYPES[team.team_type] }}
+          </span>
+          <span class="sw-status-badge {% if team.status=='open' %}sw-status-open{% else %}sw-status-closed{% endif %}">
+            {{ team.status | capitalize }}
+          </span>
+        </div>
+
+        <h2 class="fw-bold h4 mb-1">{{ team.name }}</h2>
+        <p class="text-muted small mb-3">Created by <strong>{{ team.creator_name }}</strong></p>
+
+        {% if team.description %}
+        <p class="mb-3">{{ team.description }}</p>
+        {% endif %}
+
+        <!-- Meta -->
+        <div class="sw-team-meta mb-3">
+          <span><i class="bi bi-people-fill me-1 text-primary"></i>{{ member_count }}/{{ team.max_members }} members</span>
+          {% if team.event_date %}
+          <span><i class="bi bi-calendar-event me-1 text-primary"></i>{{ team.event_date }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Spots bar -->
+        <div class="sw-spots-bar mb-1">
+          <div class="sw-spots-fill" style="width: {{ [(member_count / team.max_members * 100)|int, 100]|min }}%"></div>
+        </div>
+        <p class="small text-muted mb-4">
+          {% if member_count >= team.max_members %}
+            <span class="text-danger fw-semibold">Team is full</span>
+          {% else %}
+            <span class="text-success fw-semibold">{{ team.max_members - member_count }} spot(s) remaining</span>
+          {% endif %}
+        </p>
+
+        <!-- Actions for visitor -->
+        {% if not is_leader %}
+          {% if my_membership and my_membership.status == 'accepted' %}
+            <div class="alert alert-success py-2 small mb-3"><i class="bi bi-check-circle me-1"></i> You're a member of this team!</div>
+            {% if team.status == 'open' %}
+            <a href="{{ url_for('team_chat', team_id=team.id) }}" class="btn sw-btn-primary btn-sm w-100 mb-2">
+              <i class="bi bi-chat-square-text-fill me-1"></i> Group Chat
+            </a>
+            {% else %}
+            <div class="alert alert-secondary py-2 small mb-2"><i class="bi bi-chat-square-text me-1"></i> Group chat is only available while the team is open.</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('leave_team', team_id=team.id) }}">
+              <button class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Leave this team?')">
+                <i class="bi bi-box-arrow-left me-1"></i> Leave Team
+              </button>
+            </form>
+          {% elif my_membership and my_membership.status == 'pending' %}
+            <div class="alert alert-warning py-2 small"><i class="bi bi-hourglass-split me-1"></i> Join request sent — waiting for leader approval.</div>
+          {% elif my_membership and my_membership.status == 'rejected' %}
+            <div class="alert alert-danger py-2 small"><i class="bi bi-x-circle me-1"></i> Your request was declined.</div>
+          {% elif team.status == 'open' and member_count < team.max_members %}
+            <form method="post" action="{{ url_for('join_team', team_id=team.id) }}">
+              <button class="btn sw-btn-primary w-100"><i class="bi bi-person-plus me-1"></i> Request to Join</button>
+            </form>
+          {% elif team.status == 'closed' %}
+            <div class="alert alert-secondary py-2 small"><i class="bi bi-lock me-1"></i> This team is closed.</div>
+          {% else %}
+            <div class="alert alert-warning py-2 small"><i class="bi bi-people me-1"></i> Team is full.</div>
+          {% endif %}
+        {% endif %}
+
+        <!-- Leader controls -->
+        {% if is_leader %}
+        <div class="border-top pt-3 mt-2">
+          <p class="small fw-semibold text-muted mb-2"><i class="bi bi-shield-fill-check me-1 text-primary"></i> Leader Controls</p>
+          <div class="d-flex flex-column gap-2">
+            {% if team.status == 'open' %}
+            <a href="{{ url_for('team_chat', team_id=team.id) }}" class="btn sw-btn-primary btn-sm w-100">
+              <i class="bi bi-chat-square-text-fill me-1"></i> Group Chat
+            </a>
+            <form method="post" action="{{ url_for('close_team', team_id=team.id) }}">
+              <button class="btn btn-outline-secondary btn-sm w-100">
+                <i class="bi bi-lock me-1"></i> Close Team
+              </button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('reopen_team', team_id=team.id) }}">
+              <button class="btn btn-outline-success btn-sm w-100">
+                <i class="bi bi-unlock me-1"></i> Reopen Team
+              </button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('delete_team', team_id=team.id) }}">
+              <button class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Delete this team permanently?')">
+                <i class="bi bi-trash me-1"></i> Delete Team
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- ===== Right: Members + requests ===== -->
+    <div class="col-lg-8">
+
+      <!-- Accepted Members -->
+      <div class="sw-card p-4 mb-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-people me-2 text-primary"></i>Members <span class="badge bg-primary rounded-pill ms-1">{{ member_count }}</span></h5>
+
+        {% if members %}
+        <div class="row g-3">
+          {% for m in members %}
+          <div class="col-sm-6">
+            <div class="d-flex align-items-center gap-3 sw-member-card p-3 rounded-3">
+              {% if m.profile_picture %}
+                <img src="{{ url_for('static', filename='images/uploads/' ~ m.profile_picture) }}" class="sw-avatar sw-avatar-sm sw-avatar-img" alt="{{ m.name }}" loading="lazy" decoding="async" width="36" height="36">
+              {% else %}
+                <span class="sw-avatar sw-avatar-sm" style="background:{{ m.uid | avatar_color }}">{{ m.name | initials }}</span>
+              {% endif %}
+              <div class="flex-grow-1 min-w-0">
+                <div class="fw-semibold text-truncate">{{ m.name }}</div>
+                <div class="small text-muted text-truncate">{{ m.department or '' }}{% if m.year %} · {{ m.year }}{% endif %}</div>
+              </div>
+              {% if m.role == 'leader' %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>Leader</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small">No members yet.</p>
+        {% endif %}
+      </div>
+
+      <!-- Pending Join Requests (leader only) -->
+      {% if is_leader and pending_requests %}
+      <div class="sw-card p-4">
+        <h5 class="fw-bold mb-3">
+          <i class="bi bi-person-plus me-2 text-warning"></i>Join Requests
+          <span class="badge bg-warning text-dark rounded-pill ms-1">{{ pending_requests|length }}</span>
+        </h5>
+        <div class="d-flex flex-column gap-3">
+          {% for pr in pending_requests %}
+          <div class="d-flex align-items-center gap-3 sw-req-card p-3 rounded-3">
+            {% if pr.profile_picture %}
+              <img src="{{ url_for('static', filename='images/uploads/' ~ pr.profile_picture) }}" class="sw-avatar sw-avatar-sm sw-avatar-img" alt="{{ pr.name }}" loading="lazy" decoding="async" width="36" height="36">
+            {% else %}
+              <span class="sw-avatar sw-avatar-sm" style="background:{{ pr.uid | avatar_color }}">{{ pr.name | initials }}</span>
+            {% endif %}
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold">{{ pr.name }}</div>
+              <div class="small text-muted">{{ pr.department or '' }}{% if pr.year %} · {{ pr.year }}{% endif %}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <form method="post" action="{{ url_for('respond_team_request', team_id=team.id, member_user_id=pr.uid) }}">
+                <input type="hidden" name="action" value="accept">
+                <button class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Accept</button>
+              </form>
+              <form method="post" action="{{ url_for('respond_team_request', team_id=team.id, member_user_id=pr.uid) }}">
+                <input type="hidden" name="action" value="reject">
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i></button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% elif is_leader %}
+      <div class="sw-card p-4">
+        <h5 class="fw-bold mb-2"><i class="bi bi-person-plus me-2 text-warning"></i>Join Requests</h5>
+        <p class="text-muted small mb-0">No pending requests right now.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

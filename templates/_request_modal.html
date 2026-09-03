@@ -1,0 +1,46 @@
+<!-- ============================================================
+     Reusable "Send Swap Request" modal.
+     Opened via JS (main.js -> openRequestModal) which fills in
+     the receiver's id/name and the available skill options.
+     Expects `my_offered` (list of skill rows) to be in scope.
+============================================================= -->
+<div class="modal fade" id="requestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content sw-modal">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Send a swap request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('send_request') }}">
+        <div class="modal-body">
+          <p class="mb-3">Propose a skill swap with <strong id="reqModalName">this student</strong>.</p>
+          <input type="hidden" name="receiver_id" id="reqModalReceiverId">
+
+          <div class="mb-3">
+            <label class="form-label">What you'll teach them</label>
+            <select class="form-select sw-input" name="skill_offered" id="reqModalSkillOffered" required>
+              <option value="">Choose a skill you offer</option>
+              {% for s in my_offered %}
+              <option value="{{ s.skill_name }}">{{ s.skill_name }}</option>
+              {% endfor %}
+            </select>
+            {% if not my_offered %}
+            <div class="form-text text-warning"><i class="bi bi-exclamation-circle"></i> You haven't listed any offered skills yet &mdash; add one from your dashboard first.</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">What you want to learn from them</label>
+            <select class="form-select sw-input" name="skill_wanted" id="reqModalSkillWanted" required>
+              <option value="">Choose a skill they offer</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn sw-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn sw-btn-primary">Send request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
